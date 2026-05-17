@@ -95,6 +95,20 @@ def init_db():
             )
         ''')
 
+        # Cache/Summary of direct peer-to-peer chat logs.
+        # This keeps a high-density consolidated digest of the user's relations and plans
+        # so Yuki can pull it in sub-milliseconds without performing expensive database scans
+        # or runtime LLM calls during regular chat cycles.
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS direct_chat_summaries (
+                user_id INTEGER PRIMARY KEY,
+                summary_text TEXT NOT NULL,
+                message_count INTEGER NOT NULL,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id)
+            )
+        ''')
+
     # Self-healing database migration for adding reaction column to existing installations
     with get_data_db() as conn:
         try:

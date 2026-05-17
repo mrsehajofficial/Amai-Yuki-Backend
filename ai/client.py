@@ -45,7 +45,7 @@ def load_prompt(nsfw_mode=False):
     with open(prompt_path, 'r', encoding='utf-8') as f:
         return f.read()
 
-def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None):
+def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", direct_chat_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None):
     """
     Calls the LongCat AI API.
     Injects system prompt, memory context, custom user personality, pinned messages, and user's timezone.
@@ -55,6 +55,11 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
     raw_prompt = load_prompt(nsfw_mode)
     base_prompt = raw_prompt.replace("{memory}", memory_context if memory_context else "No prior history recorded yet.")
     base_prompt = base_prompt.replace("{user_name}", user_name)
+    
+    # Inject Direct Chat Summary (P2P interactions) if present. This allows Yuki to have
+    # full contextual awareness of who the user has been talking to and what they've discussed.
+    if direct_chat_context:
+        base_prompt += f"\n\n[USER DIRECT MESSAGES & SOCIAL CONTEXT]\nThe user has been chatting with other people on the platform. Here is a summary of their recent conversations, plans, agreements, and relationships with other users. You can use this context to reference their friends or peer-to-peer activities naturally if appropriate:\n{direct_chat_context}\n"
     
     # Inject Pinned Messages
     if pinned_messages:
@@ -128,6 +133,7 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
                 model=Config.DEFAULT_MODEL,
                 nsfw_mode=nsfw_mode,
                 memory_context=memory_context,
+                direct_chat_context=direct_chat_context,
                 custom_prompt=custom_prompt,
                 user_name=user_name,
                 pinned_messages=pinned_messages,

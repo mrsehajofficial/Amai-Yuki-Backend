@@ -63,6 +63,13 @@ def send_direct_message(current_user):
             msg_id = cursor.lastrowid
             conn.commit()
 
+        # Trigger background summarization evaluation for both the sender and receiver.
+        # Since peer-to-peer relationships involve active changes on both sides, both summaries
+        # are updated asynchronously so that Yuki knows about this exchange when chatting with either.
+        from memory.manager import check_and_trigger_direct_chat_summary
+        check_and_trigger_direct_chat_summary(current_user['id'])
+        check_and_trigger_direct_chat_summary(receiver_id)
+
         return jsonify({
             'success': True,
             'data': {
@@ -245,6 +252,12 @@ def clear_direct_chat(current_user, other_user_id):
                    OR (sender_id = ? AND receiver_id = ?)
             ''', (current_user['id'], other_user_id, other_user_id, current_user['id']))
             conn.commit()
+
+        # Force a background social memory cache update or deletion for both users.
+        # This keeps our custom system prompts clean from stale, deleted message records.
+        from memory.manager import force_direct_chat_summary
+        force_direct_chat_summary(current_user['id'])
+        force_direct_chat_summary(other_user_id)
 
         return jsonify({'success': True, 'data': {'message': 'Chat history cleared successfully'}, 'error': None})
 

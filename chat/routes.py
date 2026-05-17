@@ -9,7 +9,8 @@ from memory.manager import (
     clear_user_memory,
     get_paginated_history,
     get_pinned_messages,
-    toggle_pin_message
+    toggle_pin_message,
+    get_direct_chat_context
 )
 from config import Config
 
@@ -68,6 +69,10 @@ def send_message(current_user):
         # 1. Fetch long-term memory summary (if any)
         memory_context = get_memory_context(user_id)
 
+        # Fetch the consolidated direct user-to-user chat summary.
+        # This keeps Yuki perfectly aware of the user's offline social interactions and plans.
+        direct_chat_context = get_direct_chat_context(user_id)
+
         # Fetch pinned messages
         pinned_messages = get_pinned_messages(user_id)
 
@@ -88,6 +93,7 @@ def send_message(current_user):
             model=model,
             nsfw_mode=nsfw_mode,
             memory_context=memory_context,
+            direct_chat_context=direct_chat_context,
             custom_prompt=custom_prompt,
             user_name=user_name,
             pinned_messages=pinned_messages,
