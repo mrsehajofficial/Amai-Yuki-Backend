@@ -116,4 +116,22 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
             except ValueError:
                 error_msg = e.response.text
         
+        # Hey! If the premium/preview model failed (e.g. rate limit, exhausted quota),
+        # we don't want to throw a nasty 500 error and leave the user stranded.
+        # Instead, we gracefully fall back to our ultra-reliable default chat model.
+        if model != Config.DEFAULT_MODEL:
+            print(f"[AI Client Warning] Model '{model}' failed with error: {error_msg}. Gracefully falling back to default '{Config.DEFAULT_MODEL}'.")
+            return call_ai(
+                messages=messages,
+                primary_key=primary_key,
+                fallback_key=fallback_key,
+                model=Config.DEFAULT_MODEL,
+                nsfw_mode=nsfw_mode,
+                memory_context=memory_context,
+                custom_prompt=custom_prompt,
+                user_name=user_name,
+                pinned_messages=pinned_messages,
+                timezone_str=timezone_str
+            )
+            
         raise Exception(f"AI API Error: {error_msg}")

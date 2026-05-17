@@ -188,9 +188,13 @@ def update_settings(current_user):
         params.append(1 if data['nsfw_mode'] else 0)
         
     if 'model' in data:
-        if data['model'] in Config.MODELS.values():
+        # We need to be careful when saving settings. If the client sends a Map,
+        # a key, or a stringified map representation, we resolve it to the full, 
+        # clean model name before saving it to the SQLite database.
+        resolved_model = Config.resolve_model(data['model'])
+        if resolved_model:
             updates.append('model = ?')
-            params.append(data['model'])
+            params.append(resolved_model)
         else:
             return jsonify({'success': False, 'data': None, 'error': 'Invalid model selection'}), 400
             

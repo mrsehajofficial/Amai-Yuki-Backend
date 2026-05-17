@@ -37,10 +37,23 @@ def send_message(current_user):
     if not user_message:
         return jsonify({'success': False, 'data': None, 'error': 'Message cannot be empty'}), 400
 
-    # Determine which model to use (per-request override or user's stored preference)
-    model = data.get('model', current_user.get('model', Config.DEFAULT_MODEL))
-    if model not in Config.MODELS.values():
-        return jsonify({'success': False, 'data': None, 'error': 'Invalid model specified'}), 400
+    # Let's resolve which model to use. We check the per-request override first,
+    # then fall back to the user's stored database preference, and if all else fails,
+    # we use the system-wide default model. The resolve_model method handles strings,
+    # maps, and even Dart's raw stringified map objects gracefully.
+    model_raw = data.get('model')
+    resolved_model = Config.resolve_model(model_raw)
+    
+    if not resolved_model:
+        # Request had no valid model override; check user's profile settings
+        db_model_raw = current_user.get('model')
+        resolved_model = Config.resolve_model(db_model_raw)
+        
+    if not resolved_model:
+        # Final fallback, just to be 100% sure we don't return a 400 or crash
+        resolved_model = Config.DEFAULT_MODEL
+        
+    model = resolved_model
 
     # Determine NSFW mode (per-request override takes priority over account setting)
     nsfw_mode = data.get('nsfw', bool(current_user.get('nsfw_mode', 0)))
