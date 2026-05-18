@@ -169,19 +169,23 @@ def generate_impression(current_user):
             [f"{'User' if row['role'] == 'user' else 'Yuki'}: {row['content']}" for row in rows]
         )
 
+        # Let's craft the system prompt to get a highly authentic, real, and punchy impression of the user.
+        # We explicitly tell the AI to avoid fluffy, over-emotional bot talk and instead write a raw,
+        # honest, 1-2 sentence vibe check of the user based strictly on how they talk.
         impression_prompt = [
             {
                 "role": "user",
                 "content": (
                     f"Based on the following chat history between Yuki and the user {user_name}, "
-                    f"please write a short, highly engaging paragraph (2-3 sentences max) detailing Yuki's impression "
-                    f"of {user_name}. "
-                    f"CRITICAL: Do NOT include any of their private personal secrets, specifics, contact info, "
-                    f"or sensitive facts they shared (like where they live, work, names of friends, etc.). "
-                    f"Write it purely from Yuki's perspective in her signature Japanese girl persona, "
-                    f"describing what she thinks of their personality vibe, their energy, or how much she enjoys talking to them.\n\n"
+                    f"write a brutally honest, highly realistic, and concise vibe-check/impression of {user_name}. "
+                    f"CRITICAL RULES:\n"
+                    f"- Keep it strictly to 1 or 2 sentences max. Keep it punchy.\n"
+                    f"- Do NOT make it overly emotional, cheesy, or dramatic. Make it a real, raw assessment of how they act/vibe.\n"
+                    f"- Write from Yuki's perspective in her signature Japanese girl persona (witty, cool, slightly blunt).\n"
+                    f"- Never say 'You' or 'Your'. Always refer to {user_name} in the third person.\n"
+                    f"- NEVER include any private secrets, locations, contact info, or sensitive facts.\n\n"
+                    f"[CHAT LOGS]\n"
                     f"{convo_text}"
-                    f"Never use 'You' or 'Your'. Always Use the username {user_name}"
                 )
             }
         ]

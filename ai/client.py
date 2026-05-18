@@ -67,9 +67,19 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
         base_prompt += f"\n\n[PINNED CORE MEMORY]\nThe following messages were pinned by the user as extremely important to remember:\n{pinned_text}\n"
 
     # Inject Timezone & Local Time
+    # Hey! We want Yuki to know the time context (is it late? morning?) but we absolutely
+    # do NOT want her parroting this time or forcing a "good morning" on every single turn.
+    # So we provide this as passive system context and tell her to keep it completely natural.
     if timezone_str:
         local_time = get_local_time_str(timezone_str)
-        base_prompt += f"\n\n[USER SYSTEM TIME & TIMEZONE]\nThe user's current timezone is: {timezone_str}\nThe user's exact current local date and time is: {local_time}\nCRITICAL: You MUST respond to the user considering their current local time (e.g., say good morning/night if appropriate, acknowledge if it is extremely late/early, etc.).\n"
+        base_prompt += (
+            f"\n\n[USER SYSTEM TIME & TIMEZONE]\n"
+            f"The user's current timezone is: {timezone_str}\n"
+            f"The user's exact current local date and time is: {local_time}\n"
+            f"USAGE INSTRUCTION: Use this system time purely as passive background context to understand the user's daily cycle. "
+            f"Do NOT mention this time, do NOT say 'I see it is [time]', and do NOT force greetings (like morning/night) "
+            f"on every message unless the user asks for the time or the current time genuinely and naturally context-warrants it.\n"
+        )
 
     # 2. Add custom personality if provided
     if custom_prompt:
