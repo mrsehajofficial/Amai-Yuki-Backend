@@ -67,7 +67,8 @@ def init_db():
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                is_pinned INTEGER DEFAULT 0
+                is_pinned INTEGER DEFAULT 0,
+                reasoning TEXT
             )
         ''')
         
@@ -131,6 +132,15 @@ def init_db():
     with get_creds_db() as conn:
         try:
             conn.execute("ALTER TABLE users ADD COLUMN yuki_impression TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            # Column already exists, perfectly safe to ignore
+            pass
+
+    # Self-healing database migration for adding reasoning column to messages table
+    with get_data_db() as conn:
+        try:
+            conn.execute("ALTER TABLE messages ADD COLUMN reasoning TEXT")
             conn.commit()
         except sqlite3.OperationalError:
             # Column already exists, perfectly safe to ignore

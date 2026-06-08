@@ -11,12 +11,11 @@ class Config:
     DATA_DB = os.path.join(DB_DIR, 'data.db')
     
     # AI Settings
-    AI_BASE_URL = "https://api.longcat.chat/openai/v1/chat/completions"
+    AI_BASE_URL = "https://api.cerebras.ai/v1/chat/completions"
     
     MODELS = {
-        "omni": "LongCat-Flash-Omni-2603",
-        "chat": "LongCat-Flash-Chat-2602-Exp",
-        "preview": "LongCat-2.0-Preview"
+        "omni": "gpt-oss-120b",
+        "chat": "zai-glm-4.7"
     }
     
     DEFAULT_MODEL = MODELS["chat"]

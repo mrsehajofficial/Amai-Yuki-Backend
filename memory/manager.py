@@ -39,7 +39,7 @@ def get_recent_messages(user_id):
     return messages
 
 
-def save_messages(user_id, user_message, assistant_reply):
+def save_messages(user_id, user_message, assistant_reply, reasoning=None):
     """
     Saves both the user's message and Yuki's reply into the data.db.
     After saving, checks if we've hit the summarization threshold.
@@ -57,8 +57,8 @@ def save_messages(user_id, user_message, assistant_reply):
             (user_id, 'user', user_message, user_ts)
         )
         conn.execute(
-            'INSERT INTO messages (user_id, role, content, timestamp) VALUES (?, ?, ?, ?)',
-            (user_id, 'assistant', assistant_reply, assistant_ts)
+            'INSERT INTO messages (user_id, role, content, timestamp, reasoning) VALUES (?, ?, ?, ?, ?)',
+            (user_id, 'assistant', assistant_reply, assistant_ts, reasoning)
         )
         conn.commit()
 
@@ -437,7 +437,7 @@ def get_paginated_history(user_id, page=1, limit=20):
     with get_data_db() as conn:
         rows = conn.execute(
             '''
-            SELECT id, role, content, timestamp, is_pinned FROM messages
+            SELECT id, role, content, timestamp, is_pinned, reasoning FROM messages
             WHERE user_id = ?
             ORDER BY timestamp DESC, id DESC
             LIMIT ? OFFSET ?

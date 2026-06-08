@@ -45,7 +45,7 @@ def load_prompt(nsfw_mode=False):
     with open(prompt_path, 'r', encoding='utf-8') as f:
         return f.read()
 
-def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", direct_chat_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None):
+def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", direct_chat_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None, reasoning_effort=None, clear_thinking=None):
     """
     Calls the LongCat AI API.
     Injects system prompt, memory context, custom user personality, pinned messages, and user's timezone.
@@ -94,6 +94,10 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
         "max_tokens": 2000,
         "temperature": 0.8
     }
+    if reasoning_effort is not None:
+        data["reasoning_effort"] = reasoning_effort
+    if clear_thinking is not None:
+        data["clear_thinking"] = clear_thinking
 
     # Helper function to make the request
     def _make_request(api_key):
@@ -115,8 +119,10 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
         res.raise_for_status()
         
         response_json = res.json()
+        message = response_json['choices'][0]['message']
         return {
-            "reply": response_json['choices'][0]['message']['content'],
+            "reply": message['content'],
+            "reasoning": message.get('reasoning'),
             "model_used": response_json.get('model', model),
             "usage": response_json.get('usage', {})
         }
@@ -147,7 +153,9 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
                 custom_prompt=custom_prompt,
                 user_name=user_name,
                 pinned_messages=pinned_messages,
-                timezone_str=timezone_str
+                timezone_str=timezone_str,
+                reasoning_effort=reasoning_effort,
+                clear_thinking=clear_thinking
             )
             
         raise Exception(f"AI API Error: {error_msg}")

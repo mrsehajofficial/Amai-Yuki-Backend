@@ -64,6 +64,8 @@ def send_message(current_user):
     fallback_key = current_user.get('fallback_key')
     custom_prompt = data.get('system_prompt', '')
     timezone_str = data.get('timezone')
+    reasoning_effort = data.get('reasoning_effort')
+    clear_thinking = data.get('clear_thinking')
 
     try:
         # 1. Fetch long-term memory summary (if any)
@@ -97,18 +99,22 @@ def send_message(current_user):
             custom_prompt=custom_prompt,
             user_name=user_name,
             pinned_messages=pinned_messages,
-            timezone_str=timezone_str
+            timezone_str=timezone_str,
+            reasoning_effort=reasoning_effort,
+            clear_thinking=clear_thinking
         )
 
         assistant_reply = result['reply']
+        reasoning = result.get('reasoning')
 
         # 6. Save both messages to history (triggers background summarization if needed)
-        save_messages(user_id, user_message, assistant_reply)
+        save_messages(user_id, user_message, assistant_reply, reasoning)
 
         return jsonify({
             'success': True,
             'data': {
                 'reply': assistant_reply,
+                'reasoning': reasoning,
                 'model_used': result['model_used'],
                 'nsfw_mode': nsfw_mode,
                 'timestamp': datetime.utcnow().isoformat() + 'Z'

@@ -198,9 +198,26 @@ def update_settings(current_user):
         else:
             return jsonify({'success': False, 'data': None, 'error': 'Invalid model selection'}), 400
             
+    if 'primary_key' in data:
+        pk = data['primary_key']
+        if pk is not None:
+            pk = pk.strip()
+        if not pk:
+            return jsonify({'success': False, 'data': None, 'error': 'Primary API key cannot be empty'}), 400
+        if not pk.startswith('***'):
+            updates.append('primary_key = ?')
+            params.append(pk)
+
     if 'fallback_key' in data:
-        updates.append('fallback_key = ?')
-        params.append(data['fallback_key'])
+        fk = data['fallback_key']
+        if fk is not None:
+            fk = fk.strip()
+        if fk == "":
+            fk = None
+        if fk is None or not fk.startswith('***'):
+            updates.append('fallback_key = ?')
+            params.append(fk)
+
 
     if 'full_name' in data:
         updates.append('full_name = ?')
