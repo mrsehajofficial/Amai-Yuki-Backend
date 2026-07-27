@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from datetime import datetime
 from auth.routes import token_required
 from db.database import get_creds_db, get_data_db
+from notifications.fcm import send_to_user
+import threading
 
 direct_chat_bp = Blueprint('direct_chat', __name__, url_prefix='/direct')
 
@@ -69,6 +71,24 @@ def send_direct_message(current_user):
         from memory.manager import check_and_trigger_direct_chat_summary
         check_and_trigger_direct_chat_summary(current_user['id'])
         check_and_trigger_direct_chat_summary(receiver_id)
+
+        # Fire FCM push notification to the receiver in the background.
+        # Even if their app is completely dead, Firebase will wake the device up.
+        sender_display = current_user.get('full_name') or current_user.get('username') or 'Someone'
+        threading.Thread(
+            target=send_to_user,
+            args=(receiver_id, sender_display, content),
+            kwargs={
+                'data': {
+                    'type': 'direct_message',
+                    'sender_id': str(current_user['id']),
+                    'sender_username': current_user.get('username', ''),
+                    'sender_full_name': current_user.get('full_name') or '',
+                    'screen': 'direct_chat',
+                }
+            },
+            daemon=True
+        ).start()
 
         return jsonify({
             'success': True,

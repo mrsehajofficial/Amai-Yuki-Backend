@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amai Yuki — Web Test Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0b0d14;
+            --panel-bg: rgba(18, 22, 36, 0.85);
+            --card-bg: #161b2e;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --primary: #ec4899;
+            --primary-hover: #db2777;
+            --accent-purple: #8b5cf6;
+            --text-main: #f3f4f6;
+            --text-sub: #9ca3af;
+            --user-bubble: #2563eb;
+            --yuki-bubble: #1f2937;
+            --danger: #ef4444;
+            --success: #10b981;
+            --dev-badge: #8b5cf6;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* --- AUTH SCREEN --- */
+        #auth-screen {
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(circle at center, #1e1b4b 0%, #0b0d14 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .auth-card {
+            background: rgba(22, 27, 46, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 2.5rem;
+            border-radius: 1.5rem;
+            width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .auth-card h2 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .auth-card p {
+            color: var(--text-sub);
+            font-size: 0.9rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-group {
+            display: flex;
+            background: rgba(0,0,0,0.3);
+            border-radius: 0.75rem;
+            padding: 4px;
+            margin-bottom: 1.5rem;
+        }
+
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-sub);
+            font-weight: 600;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-sub);
+            margin-bottom: 0.35rem;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: white;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border 0.2s;
+        }
+
+        .form-input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 0.85rem;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            border: none;
+            border-radius: 0.75rem;
+            color: white;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            margin-top: 0.5rem;
+            transition: opacity 0.2s;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        /* --- MAIN APP --- */
+        #app-container {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 360px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .brand-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1.5rem;
+        }
+
+        .brand-avatar {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent-purple));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+
+        .brand-title h3 {
+            font-size: 1.1rem;
+            color: white;
+        }
+
+        .brand-title span {
+            font-size: 0.8rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .brand-title span::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--success);
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .badge-dev {
+            background: linear-gradient(135deg, var(--accent-purple), var(--primary));
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        .badge-user {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-sub);
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            display: inline-block;
+            margin-left: 6px;
+        }
+
+        .sidebar-section {
+            background: rgba(0,0,0,0.25);
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .sidebar-section h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-sub);
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .setting-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .setting-label {
+            font-size: 0.9rem;
+        }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background-color: #374151;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        select.form-input {
+            padding: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .sidebar-actions {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-top: 1rem;
+        }
+
+        .btn-secondary {
+            width: 100%;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: white;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: 0.5rem;
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        /* Dev User Card */
+        .user-manage-item {
+            background: rgba(0,0,0,0.3);
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-manage-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-manage-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .user-manage-actions {
+            display: flex;
+            gap: 4px;
+        }
+
+        /* Chat Area */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-dark);
+        }
+
+        .chat-header {
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--panel-bg);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header-info h2 {
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .chat-header-info p {
+            font-size: 0.8rem;
+            color: var(--text-sub);
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message-wrapper {
+            display: flex;
+            flex-direction: column;
+            max-width: 75%;
+        }
+
+        .message-wrapper.user {
+            align-self: flex-end;
+        }
+
+        .message-wrapper.assistant {
+            align-self: flex-start;
+        }
+
+        .message-bubble {
+            padding: 0.85rem 1.15rem;
+            border-radius: 1.25rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            position: relative;
+        }
+
+        .message-wrapper.user .message-bubble {
+            background: var(--user-bubble);
+            color: white;
+            border-bottom-right-radius: 0.25rem;
+        }
+
+        .message-wrapper.assistant .message-bubble {
+            background: var(--yuki-bubble);
+            color: var(--text-main);
+            border-bottom-left-radius: 0.25rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .reasoning-box {
+            background: rgba(0,0,0,0.3);
+            border-left: 3px solid var(--accent-purple);
+            padding: 0.5rem 0.75rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: #d1d5db;
+            margin-bottom: 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .message-meta {
+            font-size: 0.75rem;
+            color: var(--text-sub);
+            margin-top: 0.25rem;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .message-wrapper.user .message-meta {
+            align-self: flex-end;
+        }
+
+        .chat-input-container {
+            padding: 1rem 1.5rem;
+            background: var(--panel-bg);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-box {
+            display: flex;
+            gap: 0.75rem;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 1rem;
+            padding: 0.5rem 0.75rem;
+            align-items: center;
+        }
+
+        .input-box textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            font-family: inherit;
+            font-size: 0.95rem;
+            resize: none;
+            height: 40px;
+            max-height: 120px;
+            padding: 8px 0;
+        }
+
+        .btn-send {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            border: none;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-send:hover {
+            background: var(--primary-hover);
+        }
+
+        /* Impression Banner */
+        .impression-card {
+            background: linear-gradient(135deg, rgba(236,72,153,0.15), rgba(139,92,246,0.15));
+            border: 1px solid rgba(236,72,153,0.3);
+            border-radius: 1rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-style: italic;
+            font-size: 0.9rem;
+            color: #f472b6;
+        }
+
+        /* Toast Notifications */
+        #toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 0.75rem 1.25rem;
+            background: var(--card-bg);
+            border: 1px solid var(--primary);
+            border-radius: 0.75rem;
+            color: white;
+            font-size: 0.9rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        #toast.show {
+            opacity: 1;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h2>Amai Yuki 💖</h2>
+            <p>Backend Testing & Inspection Console</p>
+            
+            <div class="tab-group">
+                <button class="tab-btn active" id="tab-login" onclick="switchAuthTab('login')">Login</button>
+                <button class="tab-btn" id="tab-register" onclick="switchAuthTab('register')">Register</button>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="form-group hidden" id="group-username">
+                    <label>Username</label>
+                    <input type="text" id="input-username" class="form-input" placeholder="e.g. sehaj">
+                </div>
+                
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="input-email" class="form-input" placeholder="sehaj@yuki.ai" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="input-password" class="form-input" placeholder="••••••••" required>
+                </div>
+
+                <div class="form-group hidden" id="group-keys">
+                    <label>Cerebras Primary API Key</label>
+                    <input type="password" id="input-primary-key" class="form-input" placeholder="csk-...">
+                </div>
+
+                <button type="submit" class="btn-submit" id="btn-auth-submit">Login to Yuki</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div id="app-container" class="hidden">
+        
+        <!-- SIDEBAR -->
+        <div class="sidebar">
+            <div class="brand-header">
+                <div class="brand-avatar">Y</div>
+                <div class="brand-title">
+                    <h3>Amai Yuki</h3>
+                    <span>Backend Server Live</span>
+                </div>
+            </div>
+
+            <!-- User Info & NSFW Toggle -->
+            <div class="sidebar-section">
+                <h4>Session Settings</h4>
+                
+                <div class="setting-row">
+                    <span class="setting-label">NSFW Mode 🔥</span>
+                    <label class="switch">
+                        <input type="checkbox" id="nsfw-toggle" onchange="toggleNSFW(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+
+                <div class="setting-row" style="margin-top: 1rem;">
+                    <span class="setting-label" style="display:block; margin-bottom: 0.25rem;">Active AI Model</span>
+                </div>
+                <select id="model-select" class="form-input" onchange="changeModel(this.value)">
+                    <option value="llama3.3-70b">Llama 3.3 70B (Default)</option>
+                    <option value="llama3.1-8b">Llama 3.1 8B</option>
+                </select>
+            </div>
+
+            <!-- Impression / Vibe Check -->
+            <div class="sidebar-section">
+                <h4>Yuki's Impression</h4>
+                <div id="impression-container">
+                    <p style="font-size: 0.85rem; color: var(--text-sub);">No impression cached yet.</p>
+                </div>
+                <button class="btn-secondary" style="margin-top: 0.75rem;" onclick="generateImpression()">Generate Vibe Check ✨</button>
+            </div>
+
+            <!-- DEVELOPER CONTROL PANEL (Only shown if tag === 'dev') -->
+            <div class="sidebar-section hidden" id="dev-panel-section">
+                <h4>
+                    <span>Dev Control Panel 🛠️</span>
+                    <button class="btn-secondary btn-sm" onclick="loadDevUserList()">Refresh</button>
+                </h4>
+                <p style="font-size: 0.8rem; color: var(--text-sub); margin-bottom: 0.75rem;">Manage users & dictate how Yuki speaks to each user.</p>
+                <div id="dev-users-list">
+                    <!-- Dev user items render dynamically here -->
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="sidebar-actions">
+                <button class="btn-secondary btn-danger" onclick="clearChatHistory()">Clear Chat History 🗑️</button>
+                <button class="btn-secondary" onclick="logout()">Logout 🚪</button>
+            </div>
+        </div>
+
+        <!-- CHAT AREA -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div class="chat-header-info">
+                    <h2 id="current-user-display">Logged in as Sehaj</h2>
+                    <p id="system-status-display">Connected to Flask Server @ localhost:5000</p>
+                </div>
+            </div>
+
+            <div class="messages-container" id="messages-container">
+                <!-- Messages render dynamically here -->
+            </div>
+
+            <div class="chat-input-container">
+                <div class="input-box">
+                    <textarea id="chat-input" placeholder="Type your message to Yuki..." rows="1" onkeydown="handleKeyDown(event)"></textarea>
+                    <button class="btn-send" onclick="sendMessage()">➔</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        let currentAuthMode = 'login';
+        let authToken = localStorage.getItem('yuki_token');
+        let currentUser = null;
+        let isNsfw = false;
+
+        window.onload = async () => {
+            if (authToken) {
+                const ok = await fetchUserProfile();
+                if (ok) {
+                    showMainApp();
+                } else {
+                    showAuthScreen();
+                }
+            } else {
+                showAuthScreen();
+            }
+        };
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.innerText = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3500);
+        }
+
+        function switchAuthTab(mode) {
+            currentAuthMode = mode;
+            document.getElementById('tab-login').classList.toggle('active', mode === 'login');
+            document.getElementById('tab-register').classList.toggle('active', mode === 'register');
+            document.getElementById('group-username').classList.toggle('hidden', mode === 'login');
+            document.getElementById('group-keys').classList.toggle('hidden', mode === 'login');
+            document.getElementById('btn-auth-submit').innerText = mode === 'login' ? 'Login to Yuki' : 'Register Account';
+        }
+
+        function showAuthScreen() {
+            document.getElementById('auth-screen').classList.remove('hidden');
+            document.getElementById('app-container').classList.add('hidden');
+        }
+
+        function showMainApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+            loadModels();
+            loadChatHistory();
+            if (currentUser && currentUser.tag === 'dev') {
+                document.getElementById('dev-panel-section').classList.remove('hidden');
+                loadDevUserList();
+            }
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('input-email').value;
+            const password = document.getElementById('input-password').value;
+
+            if (currentAuthMode === 'login') {
+                try {
+                    const res = await fetch('/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        authToken = data.data.token;
+                        localStorage.setItem('yuki_token', authToken);
+                        await fetchUserProfile();
+                        showMainApp();
+                        showToast('Logged in successfully! 💕');
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                } catch (err) {
+                    showToast('Failed to connect to backend server');
+                }
+            } else {
+                const username = document.getElementById('input-username').value;
+                const primary_key = document.getElementById('input-primary-key').value;
+                try {
+                    const res = await fetch('/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, email, password, primary_key })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        showToast('Account created! Now login.');
+                        switchAuthTab('login');
+                    } else {
+                        showToast('Error: ' + data.error);
+                    }
+                } catch (err) {
+                    showToast('Registration failed');
+                }
+            }
+        }
+
+        async function fetchUserProfile() {
+            try {
+                const res = await fetch('/auth/me', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    currentUser = data.data;
+                    isNsfw = !!currentUser.nsfw_mode;
+                    document.getElementById('nsfw-toggle').checked = isNsfw;
+                    
+                    const tagBadge = currentUser.tag === 'dev' 
+                        ? '<span class="badge-dev">DEV</span>' 
+                        : '<span class="badge-user">USER</span>';
+                    
+                    document.getElementById('current-user-display').innerHTML = `Logged in as ${escapeHtml(currentUser.username)} ${tagBadge}`;
+                    
+                    if (currentUser.yuki_impression) {
+                        document.getElementById('impression-container').innerHTML = `<div class="impression-card">${escapeHtml(currentUser.yuki_impression)}</div>`;
+                    }
+                    return true;
+                }
+            } catch (err) {}
+            return false;
+        }
+
+        async function loadModels() {
+            try {
+                const res = await fetch('/chat/models', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const select = document.getElementById('model-select');
+                    select.innerHTML = '';
+                    data.data.models.forEach(m => {
+                        const opt = document.createElement('option');
+                        opt.value = m.key;
+                        opt.innerText = `${m.value} (${m.key})`;
+                        if (currentUser && currentUser.model === m.key) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+            } catch (err) {}
+        }
+
+        async function toggleNSFW(checked) {
+            isNsfw = checked;
+            try {
+                await fetch('/auth/nsfw/toggle', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                showToast(`NSFW mode ${checked ? 'enabled 🔥' : 'disabled 😇'}`);
+            } catch (err) {}
+        }
+
+        async function changeModel(modelKey) {
+            try {
+                await fetch('/auth/settings', {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ model: modelKey })
+                });
+                showToast(`Switched model to ${modelKey}`);
+            } catch (err) {}
+        }
+
+        async function loadChatHistory() {
+            try {
+                const res = await fetch('/chat/history?limit=50', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const container = document.getElementById('messages-container');
+                    container.innerHTML = '';
+                    data.data.messages.forEach(msg => {
+                        appendMessage(msg.role, msg.content, msg.reasoning);
+                    });
+                    scrollToBottom();
+                }
+            } catch (err) {}
+        }
+
+        function appendMessage(role, content, reasoning = null) {
+            const container = document.getElementById('messages-container');
+            const wrapper = document.createElement('div');
+            wrapper.className = `message-wrapper ${role}`;
+
+            let html = '';
+            if (reasoning) {
+                html += `<div class="reasoning-box">🧠 <strong>Reasoning:</strong><br>${escapeHtml(reasoning)}</div>`;
+            }
+            html += `<div class="message-bubble">${escapeHtml(content)}</div>`;
+            html += `<div class="message-meta">${role === 'user' ? 'You' : 'Yuki'}</div>`;
+
+            wrapper.innerHTML = html;
+            container.appendChild(wrapper);
+            scrollToBottom();
+            return wrapper;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.innerText = text;
+            return div.innerHTML;
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('messages-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            const textarea = document.getElementById('chat-input');
+            const msg = textarea.value.trim();
+            if (!msg) return;
+
+            textarea.value = '';
+            appendMessage('user', msg);
+
+            const typingIndicator = appendMessage('assistant', 'Yuki is typing...');
+
+            try {
+                const selectedModel = document.getElementById('model-select').value;
+                const res = await fetch('/chat/send', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: msg,
+                        model: selectedModel,
+                        nsfw: isNsfw
+                    })
+                });
+                const data = await res.json();
+                typingIndicator.remove();
+
+                if (data.success) {
+                    appendMessage('assistant', data.data.reply, data.data.reasoning);
+                } else {
+                    appendMessage('assistant', `⚠️ Error: ${data.error}`);
+                }
+            } catch (err) {
+                typingIndicator.remove();
+                appendMessage('assistant', '⚠️ Error: Failed to communicate with server.');
+            }
+        }
+
+        async function generateImpression() {
+            try {
+                showToast('Asking Yuki for a vibe check...');
+                const res = await fetch('/chat/impression/generate', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('impression-container').innerHTML = `<div class="impression-card">${escapeHtml(data.data.yuki_impression)}</div>`;
+                    showToast('Vibe check updated!');
+                } else {
+                    showToast('Error: ' + data.error);
+                }
+            } catch (err) {}
+        }
+
+        async function clearChatHistory() {
+            if (!confirm('Are you sure you want to clear all chat history?')) return;
+            try {
+                const res = await fetch('/chat/clear', {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('messages-container').innerHTML = '';
+                    showToast('Chat history wiped!');
+                }
+            } catch (err) {}
+        }
+
+        /* --- DEV PANEL FUNCTIONS --- */
+        async function loadDevUserList() {
+            try {
+                const res = await fetch('/users/list', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const listContainer = document.getElementById('dev-users-list');
+                    listContainer.innerHTML = '';
+                    if (data.data.users.length === 0) {
+                        listContainer.innerHTML = '<p style="font-size:0.8rem; color:var(--text-sub)">No other users registered yet.</p>';
+                        return;
+                    }
+                    data.data.users.forEach(u => {
+                        const div = document.createElement('div');
+                        div.className = 'user-manage-item';
+                        
+                        const isDev = u.tag === 'dev';
+                        const badgeClass = isDev ? 'badge-dev' : 'badge-user';
+                        const toggleTagBtnText = isDev ? 'Demote' : 'Make Dev';
+
+                        div.innerHTML = `
+                            <div class="user-manage-header">
+                                <span class="user-manage-name">${escapeHtml(u.username)} <span class="${badgeClass}">${u.tag.toUpperCase()}</span></span>
+                                <div class="user-manage-actions">
+                                    <button class="btn-secondary btn-sm" onclick="toggleUserTag(${u.id}, '${isDev ? 'user' : 'dev'}')">${toggleTagBtnText}</button>
+                                    <button class="btn-secondary btn-sm btn-danger" onclick="deleteUserDev(${u.id}, '${escapeHtml(u.username)}')">Delete</button>
+                                </div>
+                            </div>
+                            <button class="btn-secondary btn-sm" style="width:100%; margin-top:4px;" onclick="setCustomInstructionsDev(${u.id}, '${escapeHtml(u.username)}', \`${escapeHtml(u.custom_instructions || '')}\`)">
+                                💬 Edit How Yuki Speaks To ${escapeHtml(u.username)}
+                            </button>
+                        `;
+                        listContainer.appendChild(div);
+                    });
+                }
+            } catch (err) {
+                showToast('Failed to load user list');
+            }
+        }
+
+        async function toggleUserTag(userId, newTag) {
+            try {
+                const res = await fetch(`/users/${userId}/tag`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ tag: newTag })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Updated user tag to ${newTag}!`);
+                    loadDevUserList();
+                } else {
+                    showToast('Error: ' + data.error);
+                }
+            } catch (err) {
+                showToast('Action failed');
+            }
+        }
+
+        async function deleteUserDev(userId, username) {
+            if (!confirm(`DEV ACTION: Are you sure you want to permanently delete user '${username}'?`)) return;
+            try {
+                const res = await fetch(`/users/${userId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`User ${username} deleted!`);
+                    loadDevUserList();
+                } else {
+                    showToast('Error: ' + data.error);
+                }
+            } catch (err) {
+                showToast('Delete action failed');
+            }
+        }
+
+        async function setCustomInstructionsDev(userId, username, currentInstructions) {
+            const promptText = prompt(
+                `Dictate how Yuki must speak to '${username}'.\n\nEnter custom instructions (or leave empty to reset):`,
+                currentInstructions
+            );
+            if (promptText === null) return; // user cancelled
+
+            try {
+                const res = await fetch(`/users/${userId}/instructions`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ custom_instructions: promptText })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showToast(`Updated Yuki's instructions for ${username}!`);
+                    loadDevUserList();
+                } else {
+                    showToast('Error: ' + data.error);
+                }
+            } catch (err) {
+                showToast('Failed to update instructions');
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('yuki_token');
+            authToken = null;
+            currentUser = null;
+            showAuthScreen();
+            showToast('Logged out!');
+        }
+    </script>
+</body>
+</html>

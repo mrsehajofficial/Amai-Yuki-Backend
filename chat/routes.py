@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from auth.routes import token_required
-from ai.client import call_ai
+from ai.dispatcher import dispatch_ai
 from memory.manager import (
     get_memory_context,
     get_recent_messages,
@@ -13,6 +13,8 @@ from memory.manager import (
     get_direct_chat_context
 )
 from config import Config
+from notifications.fcm import send_to_user
+import threading
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/chat')
 
@@ -63,9 +65,20 @@ def send_message(current_user):
     primary_key = current_user['primary_key']
     fallback_key = current_user.get('fallback_key')
     custom_prompt = data.get('system_prompt', '')
+    db_custom_instructions = current_user.get('custom_instructions')
+    if db_custom_instructions:
+        if custom_prompt:
+            custom_prompt = f"{db_custom_instructions}\n\n{custom_prompt}"
+        else:
+            custom_prompt = db_custom_instructions
+
     timezone_str = data.get('timezone')
     reasoning_effort = data.get('reasoning_effort')
     clear_thinking = data.get('clear_thinking')
+
+    
+    # Resolve provider: per-request override → user's DB setting → system default
+    provider = data.get('provider') or current_user.get('provider')
 
     try:
         # 1. Fetch long-term memory summary (if any)
@@ -87,9 +100,10 @@ def send_message(current_user):
         # 4. Extract user_name from current_user
         user_name = current_user.get('full_name') or current_user.get('username') or 'User'
 
-        # 5. Call Yuki (the AI)
-        result = call_ai(
+        # 5. Call Yuki (the AI) — routes to Cerebras or Ollama based on provider
+        result = dispatch_ai(
             messages=recent_messages,
+            provider=provider,
             primary_key=primary_key,
             fallback_key=fallback_key,
             model=model,
@@ -101,7 +115,8 @@ def send_message(current_user):
             pinned_messages=pinned_messages,
             timezone_str=timezone_str,
             reasoning_effort=reasoning_effort,
-            clear_thinking=clear_thinking
+            clear_thinking=clear_thinking,
+            ollama_url=current_user.get('ollama_url')
         )
 
         assistant_reply = result['reply']
@@ -109,6 +124,17 @@ def send_message(current_user):
 
         # 6. Save both messages to history (triggers background summarization if needed)
         save_messages(user_id, user_message, assistant_reply, reasoning)
+
+        # 7. Fire FCM push notification to the user's device in the background.
+        # This makes sure the notification fires even if they closed the app while waiting.
+        # Truncate long replies so the notification body stays readable.
+        notif_body = assistant_reply[:120] + '...' if len(assistant_reply) > 120 else assistant_reply
+        threading.Thread(
+            target=send_to_user,
+            args=(user_id, 'Yuki replied ✨', notif_body),
+            kwargs={'data': {'type': 'yuki_reply', 'screen': 'chat'}},
+            daemon=True
+        ).start()
 
         return jsonify({
             'success': True,
@@ -196,13 +222,15 @@ def generate_impression(current_user):
             }
         ]
 
-        result = call_ai(
+        result = dispatch_ai(
             messages=impression_prompt,
+            provider=current_user.get('provider'),
             primary_key=primary_key,
             fallback_key=fallback_key,
             model=Config.DEFAULT_MODEL,
             nsfw_mode=False,
-            memory_context=""
+            memory_context="",
+            ollama_url=current_user.get('ollama_url')
         )
 
         impression_text = result['reply']
@@ -263,11 +291,19 @@ def clear_history(current_user):
 @token_required
 def list_models(current_user):
     """
-    Returns the list of supported models.
-    Useful for Flutter to populate a model picker.
+    Returns the list of supported cloud models (Cerebras).
     """
+    models_dict, default_model = Config.get_models_for_provider('cerebras')
     models_list = [
-        {'key': key, 'value': value} 
-        for key, value in Config.MODELS.items()
+        {'key': key, 'value': value, 'is_uncensored': True} 
+        for key, value in models_dict.items()
     ]
-    return jsonify({'success': True, 'data': {'models': models_list, 'default': Config.DEFAULT_MODEL}, 'error': None})
+    return jsonify({
+        'success': True, 
+        'data': {
+            'models': models_list, 
+            'default': default_model,
+            'provider': 'cerebras'
+        }, 
+        'error': None
+    })

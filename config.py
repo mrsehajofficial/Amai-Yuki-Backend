@@ -10,7 +10,12 @@ class Config:
     CREDS_DB = os.path.join(DB_DIR, 'creds.db')
     DATA_DB = os.path.join(DB_DIR, 'data.db')
     
-    # AI Settings
+    # --- Provider Settings ---
+    # Set AI_PROVIDER env var to 'ollama' to use local Ollama, or 'cerebras' for cloud.
+    # Both can run simultaneously — each user can have their own provider preference.
+    DEFAULT_PROVIDER = os.environ.get('AI_PROVIDER', 'cerebras')
+
+    # --- Cerebras Cloud AI Settings ---
     AI_BASE_URL = "https://api.cerebras.ai/v1/chat/completions"
     
     MODELS = {
@@ -19,6 +24,25 @@ class Config:
     }
     
     DEFAULT_MODEL = MODELS["chat"]
+
+    # --- Ollama Local AI Settings ---
+    # Ollama runs locally — no API keys, no cloud bills, no censorship. Pure freedom.
+    # These models are specifically chosen for low-end hardware (4GB RAM, integrated GPUs).
+    OLLAMA_BASE_URL = os.environ.get('OLLAMA_BASE_URL', 'http://localhost:11434')
+    
+    # Ultra-lightweight uncensored models from the dolphin family.
+    # tinydolphin: 1.1B params (~670MB) — runs on literally any PC with 4GB RAM
+    # dolphin-phi: 2.7B params (~1.6GB) — slightly better quality, still light as fuck
+    OLLAMA_MODELS = {
+        "chat": "tinydolphin",
+        "omni": "dolphin-phi"
+    }
+    
+    OLLAMA_DEFAULT_MODEL = OLLAMA_MODELS["omni"]
+    
+    # Context window for Ollama — keep it conservative for potato PCs.
+    # 2048 is safe for 4GB RAM. Bump to 4096 or 8192 if you have more juice.
+    OLLAMA_NUM_CTX = int(os.environ.get('OLLAMA_NUM_CTX', '2048'))
     
     # Context settings
     MAX_HISTORY_MESSAGES = 4 # Last 4 messages included
@@ -66,12 +90,83 @@ class Config:
                     key = match.group(1).strip().strip('\'"')
                     return cls.resolve_model(key)
             
-            # If it matches one of our actual model values, we're golden!
+            # If it matches one of our actual model values (Cerebras), we're golden!
             if model_raw in cls.MODELS.values():
                 return model_raw
                 
             # If it's a key from our MODELS dictionary, map it to the full name
             if model_raw in cls.MODELS:
                 return cls.MODELS[model_raw]
+
+            # Also check Ollama models
+            if model_raw in cls.OLLAMA_MODELS.values():
+                return model_raw
+            
+            if model_raw in cls.OLLAMA_MODELS:
+                return cls.OLLAMA_MODELS[model_raw]
                 
         return None
+
+    @classmethod
+    def resolve_ollama_model(cls, model_raw):
+        """
+        Resolves a model name for Ollama specifically.
+        If the given model is a Cerebras model name, maps it to the equivalent Ollama model.
+        If it's already a valid Ollama model name, returns it directly.
+        If we can't figure it out, returns the default Ollama model.
+        """
+        if not model_raw:
+            return cls.OLLAMA_DEFAULT_MODEL
+        
+        if isinstance(model_raw, str):
+            model_raw = model_raw.strip()
+            
+            # Direct Ollama model name (user specified exactly what they want)
+            if model_raw in cls.OLLAMA_MODELS.values():
+                return model_raw
+            
+            # Ollama model key (e.g., "chat" → "tinydolphin")
+            if model_raw in cls.OLLAMA_MODELS:
+                return cls.OLLAMA_MODELS[model_raw]
+            
+            # If it's a Cerebras model, map to the equivalent Ollama tier
+            for key, cerebras_model in cls.MODELS.items():
+                if model_raw == cerebras_model or model_raw == key:
+                    return cls.OLLAMA_MODELS.get(key, cls.OLLAMA_DEFAULT_MODEL)
+            
+            # If it looks like a custom Ollama model name (user pulled something specific),
+            # just pass it through — Ollama will handle model-not-found errors
+            return model_raw
+        
+        return cls.OLLAMA_DEFAULT_MODEL
+
+    @classmethod
+    def resolve_provider(cls, provider_raw):
+        """
+        Resolves the provider string. Returns 'cerebras' or 'ollama'.
+        Falls back to DEFAULT_PROVIDER if invalid.
+        """
+        if not provider_raw:
+            return cls.DEFAULT_PROVIDER
+        
+        if isinstance(provider_raw, str):
+            provider_raw = provider_raw.strip().lower()
+            if provider_raw in ('cerebras', 'ollama'):
+                return provider_raw
+        
+        return cls.DEFAULT_PROVIDER
+
+    @classmethod
+    def get_models_for_provider(cls, provider=None):
+        """
+        Returns the models dict for the given provider.
+        Useful for the /models endpoint to show the right model list.
+        """
+        if not provider:
+            provider = cls.DEFAULT_PROVIDER
+        
+        if provider == 'ollama':
+            return cls.OLLAMA_MODELS, cls.OLLAMA_DEFAULT_MODEL
+        else:
+            return cls.MODELS, cls.DEFAULT_MODEL
+

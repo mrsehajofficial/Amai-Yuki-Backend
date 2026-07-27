@@ -47,7 +47,7 @@ def token_required(f):
                     return jsonify({'success': False, 'data': None, 'error': 'Token has expired!'}), 401
                 
                 user = conn.execute(
-                    'SELECT id, username, full_name, email, primary_key, fallback_key, nsfw_mode, model, profile_pic, yuki_impression, last_seen FROM users WHERE id = ?',
+                    'SELECT id, username, full_name, email, primary_key, fallback_key, nsfw_mode, model, profile_pic, yuki_impression, last_seen, provider, ollama_url, tag, custom_instructions FROM users WHERE id = ?',
                     (session['user_id'],)
                 ).fetchone()
                 
@@ -60,7 +60,10 @@ def token_required(f):
 
                 # Inject user dict into kwargs or request context
                 # For simplicity, we'll pass it as a kwarg named current_user
-                kwargs['current_user'] = dict(user)
+                user_dict = dict(user)
+                if not user_dict.get('tag'):
+                    user_dict['tag'] = 'dev' if user_dict.get('username', '').lower() == 'sehaj' else 'user'
+                kwargs['current_user'] = user_dict
                 
         except Exception as e:
             print(f"Auth Decorator Error: {e}")
@@ -69,12 +72,36 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def dev_required(f):
+    @wraps(f)
+    @token_required
+    def decorated(current_user, *args, **kwargs):
+        if current_user.get('tag') != 'dev':
+            return jsonify({'success': False, 'data': None, 'error': 'Access denied: Developer privileges required'}), 403
+        return f(current_user, *args, **kwargs)
+    return decorated
+
 @auth_bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     
-    if not data or not data.get('username') or not data.get('email') or not data.get('password') or not data.get('primary_key'):
+    if not data or not data.get('username') or not data.get('email') or not data.get('password'):
         return jsonify({'success': False, 'data': None, 'error': 'Missing required fields'}), 400
+
+    # Resolve provider — Ollama users don't need API keys since it runs locally
+    provider = Config.resolve_provider(data.get('provider'))
+    
+    # For Cerebras users, primary_key is mandatory. For Ollama users, we store a placeholder.
+    primary_key = data.get('primary_key', '').strip() if data.get('primary_key') else ''
+    if provider == 'cerebras' and not primary_key:
+        return jsonify({'success': False, 'data': None, 'error': 'Primary API key is required for Cerebras provider'}), 400
+    elif provider == 'ollama' and not primary_key:
+        primary_key = 'ollama-local'  # Placeholder — Ollama doesn't need keys
+
+    # Determine tag: auto-promote 'sehaj' or allow explicit tag request
+    tag = data.get('tag', 'user')
+    if data.get('username', '').lower() == 'sehaj':
+        tag = 'dev'
 
     hashed_password = generate_password_hash(data['password'])
     
@@ -99,16 +126,19 @@ def register():
                 return jsonify({'success': False, 'data': None, 'error': 'Email already registered'}), 409
 
             conn.execute('''
-                INSERT INTO users (username, email, password_hash, primary_key, fallback_key)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO users (username, email, password_hash, primary_key, fallback_key, provider, tag)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data['username'], 
                 data['email'], 
                 hashed_password, 
-                data['primary_key'], 
-                data.get('fallback_key')
+                primary_key, 
+                data.get('fallback_key'),
+                provider,
+                tag
             ))
             conn.commit()
+
             
         return jsonify({'success': True, 'data': {'message': 'User created successfully'}, 'error': None}), 201
         
@@ -227,6 +257,15 @@ def update_settings(current_user):
         updates.append('profile_pic = ?')
         params.append(data['profile_pic'])
 
+    if 'provider' in data:
+        resolved_provider = Config.resolve_provider(data['provider'])
+        updates.append('provider = ?')
+        params.append(resolved_provider)
+
+    if 'ollama_url' in data:
+        updates.append('ollama_url = ?')
+        params.append(data['ollama_url'])
+
     if not updates:
         return jsonify({'success': False, 'data': None, 'error': 'No valid fields to update'}), 400
 
@@ -271,6 +310,34 @@ def heartbeat(current_user):
     last_seen is updated automatically by @token_required.
     """
     return jsonify({'success': True, 'data': {'status': 'active'}, 'error': None})
+
+@auth_bp.route('/fcm-token', methods=['POST'])
+@token_required
+def register_fcm_token(current_user):
+    """
+    Registers or updates the Firebase Cloud Messaging device token for the current user.
+    Called by the Flutter app on startup after it receives a fresh FCM token.
+
+    Body:
+        fcm_token (str, required) — The device's FCM registration token
+    """
+    data = request.get_json()
+    fcm_token = (data or {}).get('fcm_token', '').strip()
+
+    if not fcm_token:
+        return jsonify({'success': False, 'data': None, 'error': 'fcm_token is required'}), 400
+
+    try:
+        with get_creds_db() as conn:
+            conn.execute(
+                "UPDATE users SET fcm_token = ? WHERE id = ?",
+                (fcm_token, current_user['id'])
+            )
+            conn.commit()
+
+        return jsonify({'success': True, 'data': {'message': 'FCM token registered'}, 'error': None})
+    except Exception as e:
+        return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
 
 @auth_bp.route('/delete', methods=['DELETE'])
 @token_required

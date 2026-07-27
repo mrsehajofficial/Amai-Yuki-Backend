@@ -17,8 +17,13 @@ def create_app():
     Flask app factory.
     Creates, configures, and returns the Flask application.
     """
-    app = Flask(__name__)
+    app = Flask(__name__, static_folder='static', static_url_path='')
     app.config['SECRET_KEY'] = Config.SECRET_KEY
+
+    # --- Root Index Route (Web Test Console) ---
+    @app.route('/')
+    def index():
+        return app.send_static_file('index.html')
 
     # --- CORS ---
     # Allow requests from Flutter web and any local dev origin.

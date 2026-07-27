@@ -16,7 +16,7 @@ def list_users(current_user):
         with get_creds_db() as conn:
             # Fetch all users except the current one
             users = conn.execute(
-                'SELECT id, username, full_name, email, profile_pic, yuki_impression, last_seen FROM users WHERE id != ?',
+                'SELECT id, username, full_name, email, profile_pic, yuki_impression, last_seen, tag, custom_instructions FROM users WHERE id != ?',
                 (current_user['id'],)
             ).fetchall()
 
@@ -31,8 +31,6 @@ def list_users(current_user):
         user_list = []
         
         for u in users:
-            # SQLite timestamps are strings, we need to parse them
-            # Format: 2026-05-16 13:43:29 (UTC)
             try:
                 if not u['last_seen']:
                     last_seen = datetime.min
@@ -47,7 +45,6 @@ def list_users(current_user):
             except (ValueError, TypeError):
                 last_seen = datetime.min
 
-            # Consider online if active within last 2 minutes
             is_online = (now - last_seen) < timedelta(minutes=2)
             
             user_list.append({
@@ -56,13 +53,16 @@ def list_users(current_user):
                 'full_name': u['full_name'],
                 'email': u['email'],
                 'profile_pic': u['profile_pic'],
-                'yuki_impression': u['yuki_impression'] or "No impression recorded yet. Keep chatting with Yuki so she gets to know you! 💕",
+                'tag': u['tag'] or ('dev' if u['username'].lower() == 'sehaj' else 'user'),
+                'custom_instructions': u['custom_instructions'] or '',
+                'yuki_impression': u['yuki_impression'] or "No impression recorded yet.",
                 'is_online': is_online,
                 'last_seen': u['last_seen'],
                 'is_favorite': u['id'] in fav_ids
             })
 
         return jsonify({'success': True, 'data': {'users': user_list}, 'error': None})
+
 
     except Exception as e:
         return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
@@ -169,3 +169,101 @@ def toggle_favorite(current_user, fav_user_id):
 
     except Exception as e:
         return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
+
+
+# --- DEVELOPER ONLY ENDPOINTS ---
+from auth.routes import dev_required
+from db.database import get_data_db
+
+
+@users_bp.route('/<int:target_user_id>', methods=['DELETE'])
+@dev_required
+def dev_delete_user(current_user, target_user_id):
+    """
+    [DEV ONLY] Permanently deletes another user account and all their chat/session data.
+    """
+    if current_user['id'] == target_user_id:
+        return jsonify({'success': False, 'data': None, 'error': 'Cannot delete your own account via Dev panel. Use /auth/delete.'}), 400
+
+    try:
+        # Delete from DATA_DB
+        with get_data_db() as conn:
+            conn.execute('DELETE FROM messages WHERE user_id = ?', (target_user_id,))
+            conn.execute('DELETE FROM summaries WHERE user_id = ?', (target_user_id,))
+            conn.execute('DELETE FROM direct_messages WHERE sender_id = ? OR receiver_id = ?', (target_user_id, target_user_id))
+            conn.commit()
+
+        # Delete from CREDS_DB
+        with get_creds_db() as conn:
+            conn.execute('DELETE FROM sessions WHERE user_id = ?', (target_user_id,))
+            conn.execute('DELETE FROM favorites WHERE user_id = ? OR favorite_user_id = ?', (target_user_id, target_user_id))
+            res = conn.execute('DELETE FROM users WHERE id = ?', (target_user_id,))
+            conn.commit()
+            
+            if res.rowcount == 0:
+                return jsonify({'success': False, 'data': None, 'error': 'User not found'}), 404
+
+        return jsonify({'success': True, 'data': {'message': f'User {target_user_id} deleted successfully by Dev'}, 'error': None})
+    except Exception as e:
+        return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
+
+
+@users_bp.route('/<int:target_user_id>/tag', methods=['PATCH'])
+@dev_required
+def dev_update_user_tag(current_user, target_user_id):
+    """
+    [DEV ONLY] Updates a user's tag ('dev' or 'user').
+    """
+    from flask import request
+    data = request.get_json()
+    if not data or 'tag' not in data:
+        return jsonify({'success': False, 'data': None, 'error': 'tag field is required'}), 400
+
+    new_tag = str(data['tag']).strip().lower()
+    if new_tag not in ['dev', 'user']:
+        return jsonify({'success': False, 'data': None, 'error': 'Invalid tag. Allowed tags: dev, user'}), 400
+
+    try:
+        with get_creds_db() as conn:
+            res = conn.execute('UPDATE users SET tag = ? WHERE id = ?', (new_tag, target_user_id))
+            conn.commit()
+            if res.rowcount == 0:
+                return jsonify({'success': False, 'data': None, 'error': 'User not found'}), 404
+
+        return jsonify({'success': True, 'data': {'user_id': target_user_id, 'tag': new_tag}, 'error': None})
+    except Exception as e:
+        return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
+
+
+@users_bp.route('/<int:target_user_id>/instructions', methods=['PATCH'])
+@dev_required
+def dev_update_user_instructions(current_user, target_user_id):
+    """
+    [DEV ONLY] Sets custom system instructions dictating how Yuki must talk to this specific user.
+    """
+    from flask import request
+    data = request.get_json()
+    if data is None or 'custom_instructions' not in data:
+        return jsonify({'success': False, 'data': None, 'error': 'custom_instructions field is required'}), 400
+
+    instructions = data['custom_instructions']
+
+    try:
+        with get_creds_db() as conn:
+            res = conn.execute('UPDATE users SET custom_instructions = ? WHERE id = ?', (instructions, target_user_id))
+            conn.commit()
+            if res.rowcount == 0:
+                return jsonify({'success': False, 'data': None, 'error': 'User not found'}), 404
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'user_id': target_user_id,
+                'custom_instructions': instructions,
+                'message': 'Custom Yuki talk instructions updated for target user'
+            },
+            'error': None
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'data': None, 'error': str(e)}), 500
+

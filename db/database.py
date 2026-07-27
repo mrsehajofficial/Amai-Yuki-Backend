@@ -146,5 +146,37 @@ def init_db():
             # Column already exists, perfectly safe to ignore
             pass
 
+    # Self-healing database migration for adding tag column to users table
+    with get_creds_db() as conn:
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN tag TEXT DEFAULT 'user'")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+    # Self-healing database migration for adding custom_instructions column to users table
+    with get_creds_db() as conn:
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN custom_instructions TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+
+    # Auto-promote user 'sehaj' or first user to 'dev' tag if not set
+    with get_creds_db() as conn:
+        conn.execute("UPDATE users SET tag = 'dev' WHERE username = 'sehaj' COLLATE NOCASE")
+        conn.commit()
+
+    # Self-healing migration: fcm_token stores the Firebase Cloud Messaging device token
+    # per user so the backend can push notifications directly to their device.
+    with get_creds_db() as conn:
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN fcm_token TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists, perfectly fine
+
+
 # Run init on module load
 init_db()
+

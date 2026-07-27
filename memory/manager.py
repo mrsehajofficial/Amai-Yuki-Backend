@@ -91,12 +91,12 @@ def _run_summarization(user_id, message_count):
     """
     try:
         from db.database import get_creds_db
-        from ai.client import call_ai
+        from ai.dispatcher import dispatch_ai
 
-        # Get user's API keys, username/full_name, and current nsfw mode
+        # Get user's API keys, username/full_name, current nsfw mode, and provider
         with get_creds_db() as conn:
             user = conn.execute(
-                'SELECT username, full_name, primary_key, fallback_key, nsfw_mode FROM users WHERE id = ?',
+                'SELECT username, full_name, primary_key, fallback_key, nsfw_mode, provider FROM users WHERE id = ?',
                 (user_id,)
             ).fetchone()
 
@@ -132,8 +132,9 @@ def _run_summarization(user_id, message_count):
             }
         ]
 
-        result = call_ai(
+        result = dispatch_ai(
             messages=summary_prompt,
+            provider=user['provider'],
             primary_key=user['primary_key'],
             fallback_key=user['fallback_key'],
             model=Config.DEFAULT_MODEL,
@@ -159,8 +160,9 @@ def _run_summarization(user_id, message_count):
             }
         ]
 
-        result_impression = call_ai(
+        result_impression = dispatch_ai(
             messages=impression_prompt,
+            provider=user['provider'],
             primary_key=user['primary_key'],
             fallback_key=user['fallback_key'],
             model=Config.DEFAULT_MODEL,
@@ -272,12 +274,12 @@ def summarize_direct_chats_bg(user_id, message_count):
     """
     try:
         from db.database import get_creds_db, get_data_db
-        from ai.client import call_ai
+        from ai.dispatcher import dispatch_ai
 
         # 1. Fetch user credentials and details to locate API keys and format placeholders.
         with get_creds_db() as conn:
             user = conn.execute(
-                'SELECT username, full_name, primary_key, fallback_key FROM users WHERE id = ?',
+                'SELECT username, full_name, primary_key, fallback_key, provider FROM users WHERE id = ?',
                 (user_id,)
             ).fetchone()
 
@@ -358,8 +360,9 @@ def summarize_direct_chats_bg(user_id, message_count):
             }
         ]
 
-        result = call_ai(
+        result = dispatch_ai(
             messages=summary_prompt,
+            provider=user['provider'],
             primary_key=user['primary_key'],
             fallback_key=user['fallback_key'],
             model=Config.DEFAULT_MODEL,
@@ -471,11 +474,11 @@ def update_all_user_impressions():
     print("[Scheduler] Starting daily user impression updates...")
     try:
         from db.database import get_creds_db
-        from ai.client import call_ai
+        from ai.dispatcher import dispatch_ai
 
         # Fetch all active users
         with get_creds_db() as conn:
-            users = conn.execute('SELECT id, username, full_name, primary_key, fallback_key FROM users').fetchall()
+            users = conn.execute('SELECT id, username, full_name, primary_key, fallback_key, provider FROM users').fetchall()
 
         for u in users:
             user_id = u['id']
@@ -514,8 +517,9 @@ def update_all_user_impressions():
             ]
 
             try:
-                result = call_ai(
+                result = dispatch_ai(
                     messages=impression_prompt,
+                    provider=u['provider'],
                     primary_key=primary_key,
                     fallback_key=fallback_key,
                     model=Config.DEFAULT_MODEL,
