@@ -176,6 +176,25 @@ def init_db():
         except sqlite3.OperationalError:
             pass  # Column already exists, perfectly fine
 
+    # Self-healing migration: provider tells the AI dispatcher whether this user
+    # talks through the Cerebras cloud or a local Ollama instance. It defaults to
+    # the system-wide DEFAULT_PROVIDER for parity with fresh installs.
+    with get_creds_db() as conn:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN provider TEXT DEFAULT '{Config.DEFAULT_PROVIDER}'")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists, perfectly fine
+
+    # Self-healing migration: ollama_url lets an individual user point at their own
+    # local Ollama server instead of the system-wide OLLAMA_BASE_URL default.
+    with get_creds_db() as conn:
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN ollama_url TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass  # Column already exists, perfectly fine
+
 
 # Run init on module load
 init_db()
