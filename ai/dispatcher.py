@@ -76,11 +76,16 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
         # Default: Cerebras cloud API
         from ai.client import call_ai
         
+        # Forward the caller-resolved model (or fall back to the system default).
+        # Previously this hardcoded Config.DEFAULT_MODEL and silently dropped the
+        # user-requested model override (e.g. "agnes-2.0-flash" for the omni tier).
+        resolved_model = model or Config.DEFAULT_MODEL
+        
         return call_ai(
             messages=messages,
             primary_key=primary_key,
             fallback_key=fallback_key,
-            model= Config.DEFAULT_MODEL,
+            model=resolved_model,
             nsfw_mode=nsfw_mode,
             memory_context=memory_context,
             direct_chat_context=direct_chat_context,

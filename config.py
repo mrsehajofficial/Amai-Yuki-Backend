@@ -16,11 +16,11 @@ class Config:
     DEFAULT_PROVIDER = os.environ.get('AI_PROVIDER', 'cerebras')
 
     # --- Cerebras Cloud AI Settings ---
-    AI_BASE_URL = "https://api.cerebras.ai/v1/chat/completions"
+    AI_BASE_URL = "https://router.bynara.id/v1/chat/completions"
     
     MODELS = {
-        "omni": "gpt-oss-120b",
-        "chat": "zai-glm-4.7"
+        "omni": "agnes-2.0-flash",
+        "chat": "mistral-medium-3-5"
     }
     
     DEFAULT_MODEL = MODELS["chat"]

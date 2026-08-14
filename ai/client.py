@@ -26,6 +26,7 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
     data = {
         "model": model,
         "messages": full_messages,
+        "stream": False,
         "max_tokens": 2000,
         "temperature": 0.8
     }
