@@ -15,8 +15,31 @@ class Config:
     # Both can run simultaneously — each user can have their own provider preference.
     DEFAULT_PROVIDER = os.environ.get('AI_PROVIDER', 'cerebras')
 
-    # --- Cerebras Cloud AI Settings ---
+    # --- ByNara Cloud AI Settings (routed via Google Apps Script proxy) ---
+    # Upstream ByNara endpoint. The backend no longer calls it directly —
+    # requests go through the static Apps Script proxy below, which relays
+    # to this URL. Kept here for reference/debugging.
     AI_BASE_URL = "https://router.bynara.id/v1/chat/completions"
+
+    # Architecture:
+    #   PythonAnywhere (this backend)
+    #       │  API key + request (key used once, never stored)
+    #       ▼
+    #   Google Apps Script proxy  (holds NO keys, just forwards)
+    #       │  same payload + "Authorization: Bearer <key>"
+    #       ▼
+    #   ByNara router
+    #
+    # The ByNara key NEVER lives in Apps Script. It stays here on PythonAnywhere
+    # in each user's creds.db record (primary_key / fallback_key) and is only
+    # ever forwarded once per request — never persisted on Google's side.
+    AI_PROXY_URL = os.environ.get(
+        'AI_PROXY_URL',
+        'https://script.google.com/macros/s/AKfycbyhEax-8NBsVMv5e4g6hwsOqms-NWNiWfOINqrS8GGc8vFwJGB-18xuuuqRMcEZkQs8/exec'
+    )
+
+    # Apps Script web apps can cold-start slowly and LLM calls take time.
+    AI_REQUEST_TIMEOUT = int(os.environ.get('AI_REQUEST_TIMEOUT', '90'))
     
     MODELS = {
         "omni": "agnes-2.0-flash",
