@@ -10,14 +10,14 @@ from users.routes import users_bp
 
 # Import DB init (runs schema creation on startup)
 import db.database  # noqa: F401
-
+app = Flask(__name__, static_folder='static', static_url_path='')
 
 def create_app():
     """
     Flask app factory.
     Creates, configures, and returns the Flask application.
     """
-    app = Flask(__name__, static_folder='static', static_url_path='')
+    # app = Flask(__name__, static_folder='static', static_url_path='')
     app.config['SECRET_KEY'] = Config.SECRET_KEY
 
     # --- Root Index Route (Web Test Console) ---
@@ -92,6 +92,6 @@ if __name__ == '__main__':
     
     app.run(
         host='0.0.0.0',
-        port=5500,
+        port=5000,
         debug=True
     )

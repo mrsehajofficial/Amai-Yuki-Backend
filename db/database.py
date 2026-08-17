@@ -12,6 +12,7 @@ def get_data_db():
     conn.row_factory = sqlite3.Row
     return conn
 
+
 def init_db():
     os.makedirs(Config.DB_DIR, exist_ok=True)
     

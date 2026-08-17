@@ -17,7 +17,8 @@ def call_ollama(messages, model=None, nsfw_mode=False, memory_context="",
                 direct_chat_context="", custom_prompt="", user_name="User",
                 pinned_messages=None, timezone_str=None,
                 primary_key=None, fallback_key=None,
-                reasoning_effort=None, clear_thinking=None, ollama_url=None):
+                reasoning_effort=None, clear_thinking=None, ollama_url=None,
+                latest_message=""):
     """
     Calls the local Ollama API.
     Builds the same system prompt as the Cerebras client for consistency.
@@ -40,6 +41,7 @@ def call_ollama(messages, model=None, nsfw_mode=False, memory_context="",
         reasoning_effort: Ignored for Ollama (not supported)
         clear_thinking: Ignored for Ollama (not supported)
         ollama_url: Local Ollama URL override
+        latest_message: The current user message being responded to
     
     Returns:
         dict with keys: reply, reasoning, model_used, usage
@@ -55,7 +57,8 @@ def call_ollama(messages, model=None, nsfw_mode=False, memory_context="",
         custom_prompt=custom_prompt,
         user_name=user_name,
         pinned_messages=pinned_messages,
-        timezone_str=timezone_str
+        timezone_str=timezone_str,
+        latest_message=latest_message
     )
 
     # Build the full message array with system prompt injected
@@ -131,7 +134,8 @@ def call_ollama(messages, model=None, nsfw_mode=False, memory_context="",
                 user_name=user_name,
                 pinned_messages=pinned_messages,
                 timezone_str=timezone_str,
-                ollama_url=ollama_url
+                ollama_url=ollama_url,
+                latest_message=latest_message
             )
 
         raise Exception(f"Ollama API Error: {error_msg}")

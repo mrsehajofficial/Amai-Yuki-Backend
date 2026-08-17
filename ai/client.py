@@ -2,8 +2,7 @@ import requests
 from config import Config
 from ai.utils import build_system_prompt
 
-# Error markers that mean "your key is bad or you're being throttled" —
-# the same situations where the old direct client used HTTP 401/429.
+# Error markers that mean "your key is bad or you're being throttled"
 _TRANSIENT_TAXONOMY = (
     'api key', 'unauthorized', 'authentication', 'invalid', '401',
     'rate limit', 'too many requests', '429', 'quota', 'try again later',
@@ -12,28 +11,24 @@ _TRANSIENT_TAXONOMY = (
 
 def _extract_error(response):
     """
-    Parses a proxy response and returns (error_message, transient, body).
-
-    The Apps Script proxy always answers HTTP 200 (ContentService cannot send
-    custom status codes), so failures are detected from the JSON body:
-      - success:     {"choices": [...], "model": ..., "usage": {...}}
-      - ByNara err:  {"error": {"message": "...", "type": "..."}}
-      - proxy err:   {"error": "Missing API key"} etc.
-
+    Parses an API response and returns (error_message, transient, body).
+    
+    Handles both direct ByNara responses (may return non-200 status codes)
+    and proxy responses (always HTTP 200, errors in JSON body).
+    
     Returns:
         error_message: None on success, else a human-readable message
-        transient: True when the failure is auth/rate-limit-ish (worth trying
-                   the fallback key)
+        transient: True when the failure is auth/rate-limit-ish (worth trying fallback key)
         body: the parsed OpenAI-style JSON dict on success, else None
     """
     try:
         body = response.json()
     except ValueError:
-        return (f"AI proxy returned a non-JSON response "
+        return (f"AI returned a non-JSON response "
                 f"(HTTP {response.status_code}): {response.text[:300]}"), False, None
 
     if not isinstance(body, dict):
-        return f"AI proxy returned an unexpected payload (HTTP {response.status_code})", False, None
+        return f"AI returned an unexpected payload (HTTP {response.status_code})", False, None
 
     if body.get('choices'):
         return None, False, body
@@ -50,7 +45,7 @@ def _extract_error(response):
         haystack = f"{err_type} {code} {message}".lower()
         return message, any(marker in haystack for marker in _TRANSIENT_TAXONOMY), None
 
-    return "AI proxy returned an unexpected payload", False, None
+    return "AI returned an unexpected payload", False, None
 
 
 def _format_request_exception(error):
@@ -65,17 +60,18 @@ def _format_request_exception(error):
     return error_msg
 
 
-def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", direct_chat_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None, reasoning_effort=None, clear_thinking=None):
+def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL, nsfw_mode=False, memory_context="", direct_chat_context="", custom_prompt="", user_name="User", pinned_messages=None, timezone_str=None, reasoning_effort=None, clear_thinking=None, latest_message=""):
     """
-    Calls the ByNara cloud AI via the Google Apps Script proxy.
-
-    Architecture:
-        PythonAnywhere (this backend) → Apps Script proxy (no keys stored) → ByNara
-
+    Calls the ByNara cloud AI via direct API (fast) with Apps Script proxy fallback.
+    
+    Flow:
+        Primary:  PythonAnywhere → ByNara Router (direct, <1s)
+        Fallback: PythonAnywhere → Apps Script Proxy → ByNara Router (slow, ~3-5s)
+    
     The ByNara key comes ONLY from the user's own creds.db record (primary_key /
-    fallback_key) and is forwarded to the proxy once per request — it lives only
-    on this server and is never stored or persisted by Apps Script.
+    fallback_key) and is forwarded once per request. Never stored, never persisted.
     Falls back to fallback_key if primary_key fails with auth/rate-limit errors.
+    Falls back to proxy if direct call fails with connection/timeout errors.
     """
     # 1. Build system prompt using shared utility
     base_prompt = build_system_prompt(
@@ -85,7 +81,8 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
         custom_prompt=custom_prompt,
         user_name=user_name,
         pinned_messages=pinned_messages,
-        timezone_str=timezone_str
+        timezone_str=timezone_str,
+        latest_message=latest_message
     )
 
     # 2. Build full message array
@@ -103,14 +100,20 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
     if clear_thinking is not None:
         data["clear_thinking"] = clear_thinking
 
-    # The ByNara key comes straight from the user's creds.db record (primary_key
-    # / fallback_key) and is passed through bare — no shared server key involved.
+    # === Direct call to ByNara (fast path) ===
+    def _make_direct(api_key):
+        return requests.post(
+            Config.AI_BASE_URL,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}"
+            },
+            json=data,
+            timeout=Config.AI_REQUEST_TIMEOUT
+        )
 
-    # Send the request through the static Apps Script proxy. The key rides
-    # along as a query param (that's what the deployed proxy expects), gets
-    # turned into the Authorization header by the proxy, and dies with the
-    # request — Apps Script never persists it.
-    def _make_request(api_key):
+    # === Proxy call (fallback path) ===
+    def _make_proxy(api_key):
         return requests.post(
             Config.AI_PROXY_URL,
             params={"api_key": api_key},
@@ -119,27 +122,34 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
             timeout=Config.AI_REQUEST_TIMEOUT
         )
 
-    def _attempt(api_key):
-        """One end-to-end attempt: proxy call + error classification."""
+    def _attempt(api_key, make_fn):
+        """One end-to-end attempt: API call + error classification."""
         try:
-            return _extract_error(_make_request(api_key))
+            return _extract_error(make_fn(api_key))
         except requests.exceptions.RequestException as e:
             return _format_request_exception(e), True, None
 
-    # Try the primary key first.
-    error_msg, transient, response_json = _attempt(primary_key)
+    # Try: primary direct → fallback direct → primary proxy → fallback proxy
+    error_msg, transient, response_json = _attempt(primary_key, _make_direct)
 
-    # On auth/rate-limit failures with a fallback key available, try it.
+    # On transient failure (auth/rate-limit), try fallback key on same path
     if error_msg and transient and fallback_key:
-        error_msg, transient, response_json = _attempt(fallback_key)
+        error_msg, transient, response_json = _attempt(fallback_key, _make_direct)
+
+    # On connection/timeout failures, fall back to proxy path
+    if error_msg and not response_json:
+        error_msg_proxy, transient_proxy, response_json_proxy = _attempt(primary_key, _make_proxy)
+        if response_json_proxy is not None:
+            error_msg, transient, response_json = error_msg_proxy, transient_proxy, response_json_proxy
+
+        if error_msg and transient and fallback_key:
+            _, _, response_json_fb = _attempt(fallback_key, _make_proxy)
+            if response_json_fb is not None:
+                response_json = response_json_fb
 
     if error_msg is not None:
-        # Hey! If the premium/preview model failed (e.g. rate limit, exhausted
-        # quota), we don't want to throw a nasty 500 error and leave the user
-        # stranded. Instead, we gracefully fall back to our ultra-reliable
-        # default chat model.
         if model != Config.DEFAULT_MODEL:
-            print(f"[AI Client Warning] Model '{model}' failed with error: {error_msg}. Gracefully falling back to default '{Config.DEFAULT_MODEL}'.")
+            print(f"[AI Client Warning] Model '{model}' failed: {error_msg}. Falling back to '{Config.DEFAULT_MODEL}'.")
             return call_ai(
                 messages=messages,
                 primary_key=primary_key,
@@ -153,7 +163,8 @@ def call_ai(messages, primary_key, fallback_key=None, model=Config.DEFAULT_MODEL
                 pinned_messages=pinned_messages,
                 timezone_str=timezone_str,
                 reasoning_effort=reasoning_effort,
-                clear_thinking=clear_thinking
+                clear_thinking=clear_thinking,
+                latest_message=latest_message
             )
 
         raise Exception(f"AI API Error: {error_msg}")

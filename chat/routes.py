@@ -116,7 +116,8 @@ def send_message(current_user):
             timezone_str=timezone_str,
             reasoning_effort=reasoning_effort,
             clear_thinking=clear_thinking,
-            ollama_url=current_user.get('ollama_url')
+            ollama_url=current_user.get('ollama_url'),
+            latest_message=user_message
         )
 
         assistant_reply = result['reply']

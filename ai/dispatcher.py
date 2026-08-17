@@ -19,7 +19,8 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
                 model=None, nsfw_mode=False, memory_context="",
                 direct_chat_context="", custom_prompt="", user_name="User",
                 pinned_messages=None, timezone_str=None,
-                reasoning_effort=None, clear_thinking=None, ollama_url=None):
+                reasoning_effort=None, clear_thinking=None, ollama_url=None,
+                latest_message=""):
     """
     Universal AI dispatcher. Routes to the correct backend based on provider.
     
@@ -39,6 +40,7 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
         reasoning_effort: Cerebras-specific param
         clear_thinking: Cerebras-specific param
         ollama_url: Local Ollama URL override
+        latest_message: The current user message being responded to
     
     Returns:
         dict: {reply, reasoning, model_used, usage}
@@ -52,8 +54,6 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
     if provider == 'ollama':
         from ai.ollama_client import call_ollama
         
-        # Resolve model for Ollama — if the model is a Cerebras model name,
-        # we need to map it to an Ollama model or use the default
         resolved_model = Config.resolve_ollama_model(model) if model else None
         
         return call_ollama(
@@ -70,15 +70,13 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
             fallback_key=fallback_key,
             reasoning_effort=reasoning_effort,
             clear_thinking=clear_thinking,
-            ollama_url=ollama_url
+            ollama_url=ollama_url,
+            latest_message=latest_message
         )
     else:
         # Default: Cerebras cloud API
         from ai.client import call_ai
         
-        # Forward the caller-resolved model (or fall back to the system default).
-        # Previously this hardcoded Config.DEFAULT_MODEL and silently dropped the
-        # user-requested model override (e.g. "agnes-2.0-flash" for the omni tier).
         resolved_model = model or Config.DEFAULT_MODEL
         
         return call_ai(
@@ -94,5 +92,6 @@ def dispatch_ai(messages, provider=None, primary_key=None, fallback_key=None,
             pinned_messages=pinned_messages,
             timezone_str=timezone_str,
             reasoning_effort=reasoning_effort,
-            clear_thinking=clear_thinking
+            clear_thinking=clear_thinking,
+            latest_message=latest_message
         )

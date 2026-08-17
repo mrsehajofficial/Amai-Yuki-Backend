@@ -2,7 +2,7 @@
 Shared AI utilities for Yuki's brain.
 Both the Cerebras cloud client and the Ollama local client use these
 to build identical system prompts. Keeps Yuki's personality consistent
-no matter which cock— I mean, which backend is doing the thinking.
+no matter which backend is doing the thinking.
 """
 
 import os
@@ -29,7 +29,6 @@ def get_local_time_str(tz_name_or_offset):
         now = datetime.now(tz)
         return now.strftime("%Y-%m-%d %H:%M:%S %Z")
     except Exception:
-        # Fallback parsing
         try:
             clean_tz = tz_name_or_offset.replace("UTC", "").replace("GMT", "").strip()
             if clean_tz.startswith("+") or clean_tz.startswith("-"):
@@ -56,7 +55,7 @@ def load_prompt(nsfw_mode=False):
 
 def build_system_prompt(nsfw_mode=False, memory_context="", direct_chat_context="",
                         custom_prompt="", user_name="User", pinned_messages=None,
-                        timezone_str=None):
+                        timezone_str=None, latest_message=""):
     """
     Builds the full system prompt for Yuki — identical output regardless of
     whether we're sending it to Cerebras cloud or Ollama local.
@@ -66,47 +65,30 @@ def build_system_prompt(nsfw_mode=False, memory_context="", direct_chat_context=
     """
     # 1. Load base personality prompt
     raw_prompt = load_prompt(nsfw_mode)
-    base_prompt = raw_prompt.replace("{memory}", memory_context if memory_context else "No prior history recorded yet.")
+    base_prompt = raw_prompt.replace("{memory}", memory_context or "(no memories stored)")
     base_prompt = base_prompt.replace("{user_name}", user_name)
     
-    # 2. Inject Direct Chat Summary (P2P interactions) if present
-    if direct_chat_context:
-        base_prompt += (
-            f"\n\n[USER DIRECT MESSAGES & SOCIAL CONTEXT]\n"
-            f"The user has been chatting with other people on the platform. "
-            f"Here is a summary of their recent conversations, plans, agreements, "
-            f"and relationships with other users. You can use this context to reference "
-            f"their friends or peer-to-peer activities naturally if appropriate:\n"
-            f"{direct_chat_context}\n"
-        )
+    # 2. Inject the latest user message so Yuki knows exactly what to respond to
+    base_prompt = base_prompt.replace("{latest_message}", latest_message or "(no message)")
     
-    # 3. Inject Pinned Messages
+    # 3. Inject Direct Chat Summary (P2P interactions) if present
+    if direct_chat_context:
+        base_prompt += f"\n\n[direct_chats]\n{direct_chat_context}\n"
+    
+    # 4. Inject Pinned Messages
     if pinned_messages:
         pinned_text = "\n".join(
             [f"{'User' if p['role'] == 'user' else 'Yuki'}: {p['content']}" for p in pinned_messages]
         )
-        base_prompt += (
-            f"\n\n[PINNED CORE MEMORY]\n"
-            f"The following messages were pinned by the user as extremely important to remember:\n"
-            f"{pinned_text}\n"
-        )
+        base_prompt += f"\n\n[pinned]\n{pinned_text}\n"
 
-    # 4. Inject Timezone & Local Time
+    # 5. Inject Timezone & Local Time (compact — no long usage instructions)
     if timezone_str:
         local_time = get_local_time_str(timezone_str)
-        base_prompt += (
-            f"\n\n[USER SYSTEM TIME & TIMEZONE]\n"
-            f"The user's current timezone is: {timezone_str}\n"
-            f"The user's exact current local date and time is: {local_time}\n"
-            f"USAGE INSTRUCTION: Use this system time purely as passive background context "
-            f"to understand the user's daily cycle. "
-            f"Do NOT mention this time, do NOT say 'I see it is [time]', and do NOT force greetings "
-            f"(like morning/night) on every message unless the user asks for the time or the current "
-            f"time genuinely and naturally context-warrants it.\n"
-        )
+        base_prompt += f"\n\n[user_time]\n{timezone_str} | {local_time}\n(you may use this for contextual vibe but do not announce the time)\n"
 
-    # 5. Add custom personality if provided
+    # 6. Add custom personality if provided
     if custom_prompt:
-        base_prompt += f"\n\n[USER CUSTOM PERSONALITY INSTRUCTIONS]\n{custom_prompt}\n"
+        base_prompt += f"\n\n[custom]\n{custom_prompt}\n"
 
     return base_prompt
